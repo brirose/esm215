@@ -1,0 +1,65 @@
+---
+title: "FRAGSTATS outputs"
+author: "Bri Baker"
+date: "1/19/2022"
+output: 
+  html_document:
+    code_folding: hide
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE,
+                      message = FALSE,
+                      warning = FALSE)
+
+# required packages
+
+library(tidyverse)
+library(here)
+library(kableExtra)
+library(janitor)
+
+```
+
+```{r}
+
+frag_classes <- c("noroad_4class", "noroad_8class", "road_4class","road_8class")
+frag_lands <- c("noroad_4land", "noroad_8land", "road_4land", "road_8land")
+
+neighbors <- c("4", "8", "4", "8")
+levels <- c("noroad", "noroad", "road", "road")
+
+
+frag_class <- data.frame()
+frag_land <- data.frame()
+
+for (i in 1:4){
+  class <- paste("week_3/", frag_classes[i], ".csv", sep = "")
+  
+  file_class <- read_csv(here(name)) %>% 
+    clean_names() %>% 
+    mutate(
+      neighbor = neighbors[i],
+      level = levels[i]
+    )
+  
+  frag_class <- rbind(frag_class, file_class)
+  
+  
+  land <- paste("week_3/", frag_lands[i], ".csv", sep = "")
+  
+  file_land <- read_csv(here(name)) %>% 
+    clean_names() %>% 
+    mutate(
+      neighbor = neighbors[i],
+      level = levels[i]
+    )
+  
+  frag_land <- rbind(frag_land, file_land)
+  
+}
+
+
+```
+
+
