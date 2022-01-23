@@ -1,5 +1,5 @@
 ---
-title: "FRAGSTATS outputs"
+title: "Quantifying Landscape Pattern"
 author: "Bri Baker"
 date: "1/19/2022"
 output: 
@@ -18,10 +18,11 @@ library(tidyverse)
 library(here)
 library(kableExtra)
 library(janitor)
+library(ggrepel)
 
 ```
 
-```{r}
+```{r data}
 
 frag_classes <- c("noroad_4class", "noroad_8class", "road_4class","road_8class")
 frag_lands <- c("noroad_4land", "noroad_8land", "road_4land", "road_8land")
@@ -36,7 +37,7 @@ frag_land <- data.frame()
 for (i in 1:4){
   class <- paste("week_3/", frag_classes[i], ".csv", sep = "")
   
-  file_class <- read_csv(here(name)) %>% 
+  file_class <- read_csv(here(class)) %>% 
     clean_names() %>% 
     mutate(
       neighbor = neighbors[i],
@@ -48,7 +49,7 @@ for (i in 1:4){
   
   land <- paste("week_3/", frag_lands[i], ".csv", sep = "")
   
-  file_land <- read_csv(here(name)) %>% 
+  file_land <- read_csv(here(land)) %>% 
     clean_names() %>% 
     mutate(
       neighbor = neighbors[i],
@@ -62,4 +63,197 @@ for (i in 1:4){
 
 ```
 
+## Question 1: No Roads
 
+```{r q_1}
+
+land_comp <- frag_land %>% 
+  filter(
+    lid %in% c("tile_0014", "tile_0018", "tile_0022"),
+    level == "road"
+  ) %>% 
+  mutate(
+    type = case_when(
+      lid == "tile_0014" ~ "agricultural",
+      lid == "tile_0018" ~ "urbanizing",
+      TRUE ~ "rural"
+    )
+  ) %>% 
+  select(
+    type, neighbor, ed, pr, prd, shei
+  ) %>% 
+  pivot_longer(c(ed, pr, prd, shei))
+
+```
+
+```{r ed}
+
+metrics <- c("ed", "pr", "prd", "shei")
+
+plots <- vector("list")
+
+for (i in 1:length(metrics)){
+  metric <- metrics[i]
+  
+  title <- paste("Figure", i, ". Comparison of", metric, "across landscape types")
+  
+  metric_graph <- land_comp %>% 
+    filter(
+      name == metric
+    )
+  
+  plot <- ggplot(metric_graph, aes(x = type, y = value, fill = neighbor)) + 
+    geom_col(position = "dodge") +
+    labs(y = metric, caption = title) +
+    scale_fill_manual(values = c("peachpuff4", "sandybrown"))+
+    geom_text(aes(label = round(value, 2)), vjust = -0.15)+
+  theme_minimal()+
+    theme(
+      axis.title.x = element_blank()
+    )
+  
+  print(plot)
+  
+}
+
+```
+
+### Part a.
+
+* *Landscape edge density:* highest in the agricultural landscape type and lowest in the rural type, but fairly similar across the board (Fig 1).
+
+* *Patch richness:* highest in agricultural, similar to agricultural in urbanizing, lowest in rural (Fig 2).
+* *Patch richness density:* highest in agricultural, similar in urbanizing and rural, lowest in rural (Fig 3).
+* *Shannon evenness index:* highest in urbanizing, similar in agricultural, lowest in rural (Fig 4).
+
+
+### Part b.
+
+All landscape metrics are the same using the 4 neighbor rule as the 8 neighbor rule.
+
+
+### Part c. 
+
+```{r}
+
+`%nin%` <- negate(`%in%`)
+
+ed_classes <- frag_class %>% 
+  filter(
+    lid %in% c("tile_0014", "tile_0018", "tile_0022"),
+    level == "road",
+    neighbor == "4"
+  ) %>% 
+  mutate(
+    landscape = case_when(
+      lid == "tile_0014" ~ "agricultural",
+      lid == "tile_0018" ~ "urbanizing",
+      TRUE ~ "rural"
+    ),
+    cultivation = case_when(
+      type %in% c("Mixed Chaparral", "Coastal Oak Woodland", "Annual Grassland", "Valley Foothill Riparian", "Montane Hardwood-Conifer", "Valley Oak Woodland", "Coastal Scrub", "Closed-Cone Pine", "Lacustrine") ~ "natural",
+      TRUE ~ "cultivated"
+    )
+  ) %>% 
+  select(landscape, cultivation, type, ed) %>% 
+  mutate(
+    cultivation_binary = case_when(
+      cultivation == "natural" ~ 0,
+      TRUE ~ 1
+    )
+  ) %>% 
+  filter(type %nin% c("Barren", "Urban", "Eucalyptus"))
+
+total_ed <- ed_classes %>% 
+  group_by(cultivation, landscape) %>% 
+  summarize(sum(ed)) %>% 
+  pivot_wider(landscape, names_from = cultivation, values_from = `sum(ed)`)
+
+total_ed %>% 
+  kbl(
+    caption = "Table 1. Natural and Cultivated Edge Density of Landscapes"
+  ) %>% 
+  kable_classic()
+
+ggplot(ed_classes, aes(x = reorder(reorder(type, ed), cultivation_binary), y = ed, fill = cultivation)) + 
+  facet_wrap(vars(landscape)) +
+  geom_col(position = "dodge") +
+  scale_y_continuous(expand = c(0, 0), limits = c(0, 85))+
+  coord_flip() +
+  labs(
+    x = "Type",
+    caption = "Figure 5. Edge density comparison within landscapes"
+  )+
+  scale_fill_manual(values = c("peachpuff4", "sandybrown"))+
+  geom_text(aes(label = round(ed)), hjust = -0.1, size = 2.5)+
+  theme_minimal()+
+    theme(
+      axis.title.y = element_blank()
+    )
+
+
+```
+
+
+The agricultural landscape has the highest edge densities of cultivated classes (sum: 120), followed by urbanizing (sum: 33). Rural has far fewer of the cultivated classes to begin with and has low edge densities in the classes that it does contain (sum: 6) with pasture being the highest.
+
+The rural landscape has the highest edge densities for natural classes (sum: 193), although agricultural (sum: 91) and urbanizing (sum: 198) have more classes represented (Table 1, Figure 5).
+
+
+## Question 2: Including Roads
+
+```{r}
+
+comparison <- frag_land %>% 
+  filter(
+    lid %in% c("tile_0014", "tile_0018", "tile_0022"),
+    neighbor == 4
+  ) %>% 
+  mutate(
+    type = case_when(
+      lid == "tile_0014" ~ "agricultural",
+      lid == "tile_0018" ~ "urbanizing",
+      TRUE ~ "rural"
+    )
+  ) %>% 
+  select(
+    level, type, neighbor, ed, pr, prd, shei
+  ) %>% 
+  pivot_longer(c(ed, pr, prd, shei))
+
+
+for (i in 1:length(metrics)){
+  metric <- metrics[i]
+  
+  title <- paste("Figure", i+5, ". Comparison of", metric, "across landscape types")
+  
+  metric_graph <- comparison %>% 
+    filter(
+      name == metric
+    )
+  
+  plot <- ggplot(metric_graph, aes(x = type, y = value, fill = level)) + 
+    geom_col(position = "dodge") +
+    labs(y = metric, caption = title) +
+    scale_fill_manual(values = c("peachpuff4", "sandybrown"))+
+    geom_text_repel(aes(label = round(value,2)))+
+  theme_minimal()+
+    theme(
+      axis.title.x = element_blank()
+    )
+  
+  print(plot)
+  
+}
+
+```
+
+
+Patch richness and patch richness density are the same whether roads are considered or not (Figure 7, Figure 8).
+
+Both edge density and SHEI are overestimated by the no road case. This overestimation is stronger for edge density where the rural and urbanizing landscapes have higher overestimation than agricultural (Figure 6). For SHEI, overestimation is highest for the rural landscape (Figure 9).
+
+
+## Question 3: Applications
+
+The metrics here can be utilized to prioritize landscape types for conservation. For example, a planner might choose to prioritize acquisition of landscapes with a high SHEI or focus their study of the population of a focal species in landscapes with high edge density.
