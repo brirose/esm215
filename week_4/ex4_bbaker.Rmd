@@ -1,0 +1,105 @@
+---
+title: "Edge and road effects in the landscape"
+author: "Bri Baker"
+date: "1/29/2022"
+output: 
+  html_document:
+    code_folding: hide
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+library(tidyverse)
+library(here)
+library(kableExtra)
+library(janitor)
+library(ggrepel)
+
+```
+
+```{r data}
+
+adj_p1 <- read_csv(here("week_4/ex4_outputsadj.csv")) %>% 
+  column_to_rownames("row_names")
+
+class_p1 <- read_csv(here("week_4/ex4_outputsclass.csv")) %>% 
+  clean_names()
+
+land_p1 <- read_csv(here("week_4/ex4_outputsland.csv")) %>% 
+  clean_names()
+
+```
+
+## Part 1: Core Area and Edge Depth
+
+```{r ce_depth}
+
+core_areas_p1 <- class_p1 %>% 
+  filter(type %in% c("Costal Scrub", "Mixed Chaparral", "Coastal Oak Woodland",
+                     "Closed-Cone Pine", "Valley Foothill Riparian" )) %>% 
+  select(type:cwed) %>% 
+  rename(
+    "Total Core Area (ha)" = "tca",
+    "Core Area %" = "cpland",
+    "Disjunct Core Areas" = "ndca",
+    "Contrast-weighted Edge Density" = "cwed"
+  )
+
+```
+
+
+## Part 2: Habitat Assumptions
+
+```{r}
+
+class_p2 <- read_csv(here("week_4/ex4_outputs2class.csv")) %>% 
+  clean_names()
+
+land_p2 <- read_csv(here("week_4/ex4_outputs2land.csv")) %>% 
+  clean_names()
+
+patch_p2 <- read_csv(here("week_4/ex4_outputs2patch.csv")) %>% 
+  clean_names()
+
+```
+
+
+### Habitat Comparisons (a)
+
+```{r}
+
+comparisons_p2 <- class_p2 %>% 
+  filter(type == "habitat") %>%
+  column_to_rownames("lid") %>% 
+  select(ca:ndca) %>% 
+  rename(
+    "Amount of Habitat (ha)" = "ca",
+    "Disjunct Patches (count)" = "ndca",
+    "Edge Density" = "ed"
+  )
+  
+
+```
+
+
+### Adequately Sized Patches
+
+```{r}
+
+adequate_p2 <- patch_p2 %>% 
+  filter(lid %in% c("hab", "habrdurb"),
+         type == "habitat",
+         area >= 400) %>% 
+  mutate(count=1) %>% 
+  group_by(lid) %>% 
+  summarize(
+    area = sum(area),
+    count = sum(count)
+  ) %>% 
+  column_to_rownames("lid") 
+
+```
+
+
+
