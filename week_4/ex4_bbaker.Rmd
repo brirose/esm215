@@ -8,7 +8,9 @@ output:
 ---
 
 ```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE)
+knitr::opts_chunk$set(echo = TRUE,
+                      message = FALSE,
+                      warning = FALSE)
 
 library(tidyverse)
 library(here)
@@ -33,19 +35,46 @@ land_p1 <- read_csv(here("week_4/ex4_outputsland.csv")) %>%
 
 ## Part 1: Core Area and Edge Depth
 
+### Total Core Area
+
+Total core area (TCA) gives a sense of how much core area across the landscape makes up each class. Of the highly suitable native habitat types for *P. blainvillii*, Mixed Chaparral has the most area, followed by Coastal Scrub and Coastal Oak Woodland. Closed-Cone Pine and Valley Foothill Riparian have a fraction of the area of the more abundant classes (Table 1).
+
+
+### Core Area (%)
+
+Core area percent characterizes what percent of the total area each class makes up. As expected, this measure follows the same pattern as total core area since it is TCA of each class divided by the core area of the entire landscape. The classes with higher percentages make up more of the landscape, although this measure does not necessarily characterize their continuity across the landscape. In aggregate, suitable core area for *P. blainvillii* makes up 40.53% of the core area of the landscape (Table 1).
+
+
+### Disjunct Core Areas
+
+Disjunct core areas (DCA) is the number of patches of each class. Classes with a large number of DCA have more edge. When this is paired with small total area, the edge effects are proportionally higher. In this case, chaparral has fewer core areas than coastal scrub, indicating that the patches of chaparral are larger since the two class types have similar TCA. Closed-cone pine and riparian areas have fewer patches since they make up a smaller proportion of the TCA, but the area of each patch is small (Table 1).
+
+
+### Contrast-weighted Edge Density
+
+Contrast-weighted Edge Density (CWED) is an index that characterizes the amount of edge per class weighted by the contrast that each patch has with surrounding patches. Higher numbers indicate high edge amount and/or large differences between a patch and surrounding habitat. Here, Coastal Scrub has the largest index, indicating that its patches are smaller, thus have more edge proportionally, and that the habitats surrounding it are very different from than it. Mixed Chaparral and Oak Woodland also have fairly large CWED, likely as a result of the fact that there are many patches of each. While it makes up the least area, Riparian follows closely behind because it has a high relative number of patches and the surrounding habitat is fairly different from riparian. That Closed-cone Pine has such a low index indicates that the areas surrounding it have fairly similar habitat (Table 1).
+
+
 ```{r ce_depth}
 
 core_areas_p1 <- class_p1 %>% 
-  filter(type %in% c("Costal Scrub", "Mixed Chaparral", "Coastal Oak Woodland",
-                     "Closed-Cone Pine", "Valley Foothill Riparian" )) %>% 
+  filter(type %in% c("Coastal Scrub", "Mixed Chaparral", "Coastal Oak Woodland","Closed-Cone Pine", "Valley Foothill Riparian" )) %>% 
   select(type:cwed) %>% 
   rename(
     "Total Core Area (ha)" = "tca",
-    "Core Area %" = "cpland",
-    "Disjunct Core Areas" = "ndca",
-    "Contrast-weighted Edge Density" = "cwed"
-  )
+    "Core Area (%)" = "cpland",
+    "Disjunct Core Areas (count)" = "ndca",
+    "Contrast-weighted Edge Density" = "cwed",
+    "Class Type" = "type"
+  ) %>% 
+  adorn_totals("row")
 
+core_areas_p1 %>% 
+  kbl(
+    caption = "Table 1. Core area across vegetation types.",
+    digits = 2,
+    booktabs = TRUE) %>%
+  kable_styling(latex_options = "striped")
 ```
 
 
@@ -64,13 +93,20 @@ patch_p2 <- read_csv(here("week_4/ex4_outputs2patch.csv")) %>%
 
 ```
 
-
 ### Habitat Comparisons (a)
 
+When roads and urban effects are not taken into account, there are more patches and more habitat area, as well as higher edge density. All three metrics trend down as road and urban effects increase. This indicates that as there are more roads and more urban area in an area, there is less suitable habitat. Organisms like *P. blainvillii* that are sensitive to edge effects further from roads and urban areas have less suitable habitat when than those less sensitive to those kind of effects (Table 2).
 ```{r}
 
 comparisons_p2 <- class_p2 %>% 
   filter(type == "habitat") %>%
+  mutate(
+    lid = case_when(
+      lid == "hab" ~ "No road or urban edge",
+      lid == "habrd40" ~ "40m road edge",
+      lid == "habrdurb" ~ "150m road and 200m urban edge"
+    )
+  ) %>% 
   column_to_rownames("lid") %>% 
   select(ca:ndca) %>% 
   rename(
@@ -78,12 +114,21 @@ comparisons_p2 <- class_p2 %>%
     "Disjunct Patches (count)" = "ndca",
     "Edge Density" = "ed"
   )
-  
+
+comparisons_p2 %>% 
+  kbl(
+    caption = "Table 2. Comparison of habitat amounts between different edge effect considerations.",
+    digits = 2,
+    booktabs = TRUE) %>%
+  kable_styling(latex_options = "striped")  
 
 ```
 
 
-### Adequately Sized Patches
+
+### Adequately Sized Patches (b)
+
+Consideration of road an urban effects reduces the total area of large enough patches (at least 200 ha) by eliminating one of the possible patches that is available when these effects are not considered. If road and urban effects were not taken into consideration and that patch were chosen as a protected area, the likelihood of it having a successful population of *P. blainvillii* is low. Especially when sensitive species are targets, it is imperative to consider road and urban effects in making decisions about core conservation area (Table 3). 
 
 ```{r}
 
@@ -91,13 +136,24 @@ adequate_p2 <- patch_p2 %>%
   filter(lid %in% c("hab", "habrdurb"),
          type == "habitat",
          area >= 400) %>% 
-  mutate(count=1) %>% 
+  mutate(count=1,
+         lid = case_when(
+           lid == "hab" ~ "No road or urban edge",
+           lid == "habrdurb" ~ "150m road and 200m urban edge"
+         )) %>% 
   group_by(lid) %>% 
   summarize(
     area = sum(area),
     count = sum(count)
   ) %>% 
   column_to_rownames("lid") 
+
+adequate_p2 %>% 
+  kbl(
+    caption = "Table 3. Comparison of adequate habitat between different edge effect considerations.",
+    digits = 2,
+    booktabs = TRUE) %>%
+  kable_styling(latex_options = "striped") 
 
 ```
 
