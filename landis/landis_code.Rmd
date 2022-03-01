@@ -1,0 +1,111 @@
+---
+title: "LANDIS II"
+author: "Bri Baker"
+date: "3/1/2022"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+library(tidyverse)
+library(here)
+library(janitor)
+
+```
+
+# No Disturbance
+
+Fill in from gdoc
+
+# Base Fire
+
+## Part 1
+
+```{r basefire_data}
+
+base_fire <- read_csv(here("landis/base_fire/scenario_1/fire-log.csv")) %>%   clean_names() %>% 
+  mutate(scenario = "1")
+  
+s2_fire <- read_csv(here("landis/base_fire/scenario_2/fire-log.csv")) %>% 
+  clean_names() %>% 
+  mutate(scenario = "2")
+
+s3_fire <- read_csv(here("landis/base_fire/scenario_3/fire-log.csv")) %>% 
+  clean_names() %>% 
+  mutate(scenario = "3")
+
+s4_fire <- read_csv(here("landis/base_fire/scenario_4/fire-log.csv")) %>% 
+  clean_names() %>% 
+  mutate(scenario = "4")
+
+base_fire <- rbind(base_fire, s2_fire)
+base_fire <- rbind(base_fire, s3_fire)
+base_fire <- rbind(base_fire, s4_fire)
+
+```
+
+```{r count_fire}
+
+fire_n <- base_fire %>%
+  count(scenario) %>% 
+  rename("count" = "n")
+
+```
+
+```{r mean_size}
+
+#hectare per cell
+ha <- 0.09
+
+mean_fire <- base_fire %>% 
+  group_by(scenario) %>%
+  summarise(sum_ha = sum(burned_sites)*ha) %>% 
+  left_join(fire_n) %>% 
+  mutate(avg_size_ha = sum_ha/count)
+  
+
+```
+
+```{r severity}
+mean_severity <- base_fire %>% 
+  group_by(scenario) %>% 
+  summarise(sum_sev = sum(severity)) %>% 
+  left_join(fire_n) %>% 
+  mutate(avg_sev = sum_sev/count) %>% 
+  select(scenario, avg_sev)
+
+fire_summary <- left_join(mean_fire, mean_severity)
+  
+```
+
+```{r area_per_yr}
+
+yrs <- 50
+
+fire_summary <- fire_summary %>% 
+  mutate(area_yr_ha = sum_ha/yrs)
+  
+```
+
+```{r landscape_rot}
+
+landscape_area <- 371*307*ha
+
+fire_summary <- fire_summary %>% 
+  mutate(rotation = landscape_area/area_yr_ha)
+
+```
+
+
+## Part 2
+
+For each scenario, examine the attribute table in the output\max-spp-age folder to tabulate the proportion of the Burton Mesa study area occupied by the rare obligate seeding shrub, Sand buck brush (Ceanothus cuneatus var. fascicularis (ceanramu)), in years 0, 25 and 50. The proportion not occupied is the (# of cells where max age = 0)/(# cells in landscape = 113,897). The proportion occupied is 1 – proportion not occupied.
+
+## Discussion
+
+1) Based on the 4 fire regime scenarios, how does ignition frequency affect fire frequency, mean fire severity, and fire rotation interval in the study area?
+
+2) 1) Based on the 4 fire regime scenarios, how does the fire spread parameter affect mean fire severity and fire rotation interval in the study area?
+
+3) Which fire regime appears to best promote Sand buck brush in the study area? 
